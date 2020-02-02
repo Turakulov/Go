@@ -27,7 +27,7 @@ func Scraper(url string) (string, error) {
 	// Request the HTML page.
 	res, err := http.Get(url)
 	if err != nil {
-		return "nil", err
+		log.Fatal(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -37,7 +37,7 @@ func Scraper(url string) (string, error) {
 	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		return "nil", err
+		log.Fatal(err)
 	}
 
 	var temperature string
