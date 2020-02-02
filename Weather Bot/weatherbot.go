@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"reflect"
 
 	"github.com/PuerkitoBio/goquery"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -23,7 +24,7 @@ var districts = map[string]string{
 	"Dubai, UAE":            "https://world-weather.ru/pogoda/uae/dubai/",
 }
 
-func Scraper(url string) (string, error) {
+func Scraper(url string, text string) (string, error) {
 	// Request the HTML page.
 	res, err := http.Get(url)
 	if err != nil {
@@ -40,13 +41,18 @@ func Scraper(url string) (string, error) {
 		log.Fatal(err)
 	}
 
-	var temperature string
+	var temp string
 	// Find the review items
 	doc.Find(".dw-into").Each(func(i int, s *goquery.Selection) {
-		t := strings.Replace(strings.TrimSuffix(s.Text(), "Скрыть"), " Подробнее", " ", 1)
-		temperature = strings.Replace(t, "Сегодня", "cегодня", 1)
+		t := strings.SplitAfter(strings.Replace(strings.Replace(strings.TrimSuffix(s.Text(), "Скрыть"), " Подробнее", " ", 1), "Сегодня", "cейчас", 1), "%")
+ 
+		if text == "/show_tomorrow_weather"{
+			temp = strings.Join(t[1:], "")
+		}else{
+			temp = strings.Join(t[:1], "")
+		}
 	})
-	return temperature, nil
+	return temp, nil
 
 }
 
@@ -72,27 +78,34 @@ func main() {
 	// получаем все обновления из канала updates
 	for update := range updates {
 
-		if update.Message.Text == "/start" {
-			bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Cписок городов и стран для вывода погоды: "))
-			for v := range districts {
-				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, v))
-			}
-		}
-		if update.Message.Text == "go" || update.Message.Text == "Go" || update.Message.Text == "/go" {
-			for v, url := range districts {
-				strs, err := Scraper(url)
-				if err != nil {
-					bot.Send(tgbotapi.NewMessage(
-						update.Message.Chat.ID,
-						"Sorry, error happend",
-					))
-				} else {
-					bot.Send(tgbotapi.NewMessage(
-						update.Message.Chat.ID,
-						"В "+v+" "+strs+"\n",
-					))
+		if reflect.TypeOf(update.Message.Text).Kind() == reflect.String && update.Message.Text != "" {
+
+			switch update.Message.Text {
+			case "/start":
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Cписок городов и стран для вывода погоды: "))
+				for v := range districts {
+					bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, v))
 				}
-			}
+			case "/show_weather", "/show_tomorrow_weather":
+				for v, url := range districts {
+					strs, err := Scraper(url, update.Message.Text)
+					if err != nil {
+						bot.Send(tgbotapi.NewMessage(
+							update.Message.Chat.ID,
+							"Sorry, error happend",
+						))
+					} else {
+						bot.Send(tgbotapi.NewMessage(
+							update.Message.Chat.ID,
+							"В "+v+" "+strs+"\n",
+						))
+					}
+				}
+			default:
+				bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Я не понимаю Вас! Пожалуйста, вводите команды. "))
+
 		}
 	}
 }
+}
+
